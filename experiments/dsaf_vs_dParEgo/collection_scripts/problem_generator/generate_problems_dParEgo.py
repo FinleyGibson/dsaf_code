@@ -1,11 +1,13 @@
 import os
 import rootpath
 from testsuite.analysis_tools import strip_problem_names, get_factors
+import sys
 
 
 # target_dir = os.raw_path.join(rootpath.detect(), "experiments/data/saf_directed/")
 # target_dir = os.path.join(rootpath.detect(), "experiments/data/saf_undirected/")
-target_dir = "../test_dir"
+# target_dir = "../test_dir"
+target_dir = sys.argv[1]
 assert os.path.isdir(target_dir)
 
 problem_list = [
