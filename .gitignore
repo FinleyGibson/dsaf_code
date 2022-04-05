@@ -1,0 +1,13 @@
+	# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+# data file_extensions
+*.json
+*.pkl
+*.pdf
+*.png
+
+

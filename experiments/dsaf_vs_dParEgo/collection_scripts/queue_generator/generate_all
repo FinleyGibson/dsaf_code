@@ -1,0 +1,7 @@
+#!/bin/bash
+
+for directory in $1*
+do
+  echo $directory;
+  python generate_queue_dParEgo.py "$directory";
+done
