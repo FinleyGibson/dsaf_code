@@ -1,6 +1,9 @@
 import numpy as np
+import wfg
+
 from testsuite.optimisers import Saf, ParEgo
 from testsuite.utilities import Pareto_split, optional_inversion, sigmoid
+from testsuite.acquisition_functions import scalar_expected_improvement
 from itertools import combinations
 import time
 import cma
@@ -314,7 +317,7 @@ class DirectedParEgo(ParEgo):
     def __init__(self, *args, target, s=5, rho=0.05, ei=True, surrogate=None,
                  cmaes_restarts=0, **kwargs):
         self.target = target
-        super().__init__(*args, s=s, rho=rho, ei=ei, surrogate=surrogate, 
+        super().__init__(*args, s=s, rho=rho, ei=ei, surrogate=surrogate,
                          cmaes_restarts=cmaes_restarts, **kwargs)
         
     def get_next_x(self, excluded_indices=None):
@@ -323,11 +326,13 @@ class DirectedParEgo(ParEgo):
         to evaluate in optimisation sequence.
         :return: x_new [np.array] shape (1, n_dims)
         """
-        y = self.apply_weighting(self.y)
-        lambda_i = self._get_lambda(self.s, self.n_objectives)
-        z = self._get_z(lambda_i)
-        self._dace_directed(self.x, y, z, lambda_i)
+        w = self._get_w()
+        z = self._get_z()
         # update model with new f_lambda
+
+        y = np.array([self._dace_directed(yi, z, w) for yi in self.y])
+        y = self._normalise(y)
+        self.surrogate.update(self.x, y)
 
         seed = np.random.uniform(self.limits[0], self.limits[1],
                                  self.surrogate.x_dims)
@@ -335,49 +340,71 @@ class DirectedParEgo(ParEgo):
                        sigma0=0.25,
                        options={'bounds': [self.limits[0], self.limits[1]],
                                 'maxfevals': 1e5},
+                       args=[y],
                        restarts=self.cmaes_restarts)
 
         x_new = res[0]
         return x_new
 
-    @staticmethod
-    def _get_lambda(s, n_obj):
-        return np.arange(n_obj)*2
-        # return np.ones(n_obj)
+    def _generate_filename(self, **kwargs):
+        return super()._generate_filename(target=np.round(self.target, 2),
+                                          rho=self.rho, s=self.s, **kwargs)
 
-    def _get_z(self, w,):
+    def _get_w(self):
+        return 1/(np.arange(1, self.n_objectives+1)*2)
+
+    def _get_z(self,):
         return self.target
 
-    def _dace_directed(self, x, y, z, lambda_i):
-        y_norm = self._normalise(y)
-        f_lambda = np.max((y_norm-z)*lambda_i, axis=1) + \
-                   (self.rho*np.dot(y_norm, lambda_i))
-        self.surrogate.update(x, f_lambda)
+    def _dace_directed(self, y, z, w):
+        return np.max((y - z) * w) + (self.rho * np.dot(y, w))
+
+    def alpha(self, xi, y):
+        mu, var = self.surrogate.predict(xi)
+        # invert becasue we are finding the expected improvement to minimisation
+        ei = scalar_expected_improvement(mu, var, y=y, invert=True)
+        # -ei because fmin minimises the acquisition function so we want
+        # negative of improvement in order to maxmise improvement.
+        return -float(ei)
+
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    from matplotlib.cm import viridis
-    import wfg
-    from testsuite.surrogates import GP, RF, MultiSurrogate
     import sys
     import os
     import rootpath
     from testsuite.surrogates import  MultiSurrogate, GP
+    from testsuite.analysis_tools import get_factors
 
     problem_path = os.path.join(rootpath.detect(), 'experiments/directed/data/wfg6_3obj_8dim')
     sys.path.append(problem_path)
 
-    from problem_setup import func, limits, objective_function
-
     t = [0.561, 4.037, 2.013]
+    t = [0.2, 1.2, 4.]
     seed = 5
     surrogate = MultiSurrogate(GP, scaled=True)
 
-    opt = DirectedSaf(objective_function=objective_function, ei=False,  targets=t,
-                w=0.5, limits=limits, surrogate=surrogate, n_initial=10,
-                budget=150, log_dir="./log_dir", seed=seed)
-
-    opt.optimise()
+    n_dim = 6
+    limits = np.zeros((2, n_dim))
+    limits[1] = np.array(range(1, n_dim + 1)) * 2
 
 
+    def objective_function(x):
+        M = 3
+        kfactor, lfactor = get_factors(M, n_dim)
+        k = kfactor * (M - 1)  # position related params
+        l = lfactor * 2  # distance related params
+        if x.ndim < 2:
+            x = x.reshape(1, -1)
+        return np.array([ wfg.WFG6(xi, k, M) for xi in x])
 
+    #
+    #
+    # opt.optimise()
+    #
+    #
+    #
+
+    opt = DirectedParEgo(objective_function=objective_function, ei=True,
+                         target=t, limits=limits, surrogate=GP(), n_initial=10,
+                         budget=12, log_dir="./test_results", seed=seed)
+    opt.optimise(2)

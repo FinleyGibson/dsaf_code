@@ -89,7 +89,7 @@ def load_igd_result(file_name):
 def save_fig(fig, filename):
 
     savedirs = [
-        os.path.join(rootpath.detect(), "experiments/directed/analysis/results_tables/paper_figure_notebooks/figures/"),
+        os.path.join(rootpath.detect(), "experiments/dsaf_vs_saf/analysis/results_analysis/figures/"),
         os.path.join(PATH_TO_REPORT_REPO, "figures/")]
     for d in savedirs:
         fig.savefig(os.path.join(d, filename+".png"), dpi=300, facecolor=None, edgecolor=None,
