@@ -60,7 +60,7 @@ opt_opts = {'dparego': "DirectedParEgo(objective_function=objective_function, "
             }
 
 # do initial optimisations
-seeds = list(range(31))
+seeds = list(range(11))
 
 # find which exist already
 existing_result_paths = get_filenames_of_all_results_within_tree(log_dir)
