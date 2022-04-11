@@ -367,6 +367,13 @@ class DirectedParEgo(ParEgo):
         # negative of improvement in order to maxmise improvement.
         return -float(ei)
 
+    def _get_loggables(self, **kwargs):
+        log_data = {'targets': self.targets,
+                    'target_history': self.target_history
+                    }
+        return super()._get_loggables(**log_data, **kwargs)
+
+
 
 if __name__ == "__main__":
     import sys
