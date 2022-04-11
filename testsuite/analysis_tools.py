@@ -402,7 +402,7 @@ def get_dual_hypervolume_refvol_points(problem, n_target):
     problem_ = "_".join(problem.split("_")[:2])
     dhv_path = os.path.join(
         rootpath.detect(),
-        "xperiments/dsaf_vs_saf/analysis/processing_scripts/"
+        "experiments/dsaf_vs_saf/analysis/processing_scripts/"
         "dual_hypervolume_processing/dual_hypervolume_volume_monte_samples/"
         +problem_+f"_{n_target}.json")
 

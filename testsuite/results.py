@@ -270,11 +270,15 @@ class ResultsContainer:
                                             ref_points_a=rp_a,
                                             ref_points_b=rp_b,
                                             )
-        for result in self.reference:
-            result.compute_dual_hypervolume_history(sample_freq=sample_freq,
-                                            ref_points_a=rp_a,
-                                            ref_points_b=rp_b,
-                                            )
+        try:
+            for result in self.reference:
+                result.compute_dual_hypervolume_history(sample_freq=sample_freq,
+                                                ref_points_a=rp_a,
+                                                ref_points_b=rp_b,
+                                                )
+        except TypeError:
+            self.reference = None
+            
         # except TypeError:
         #     assert self.reference is None
         #     # no reference results present

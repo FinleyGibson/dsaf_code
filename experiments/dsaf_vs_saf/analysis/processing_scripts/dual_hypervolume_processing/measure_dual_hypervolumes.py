@@ -51,7 +51,7 @@ LOG_INTERVAL = list(range(10, 150, 10))
 # allows for path to problem_dir, problem_name and prolem_name/ as arguments 
 # problem_name = sys.argv[1]
 from testsuite.utilities import PROBLEM_CONFIGURATIONS
-PROBLEM_CONFIGURATIONS = ["wfg6_4obj_10dim"]
+# PROBLEM_CONFIGURATIONS = ["wfg6_4obj_10dim"]
 for problem_name in PROBLEM_CONFIGURATIONS:
     prob_n, obj_n, dim_n = strip_problem_names(problem_name)
     # if obj_n != 4:
