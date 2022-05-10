@@ -1,13 +1,10 @@
 import os
 import rootpath
 import numpy as np
-
 from testsuite.utilities import PROBLEM_CONFIGURATIONS, TARGETS_D
 from testsuite.results import ResultsContainer
 from testsuite.analysis_tools import map_target_to_target_n, strip_problem_names
 from multiprocessing import Pool
-
-
 
 def get_dir_from_target(target, target_dirs):
     """
@@ -42,68 +39,56 @@ def get_refdir_from_name(problem_name, ref_dirs):
     return None
 
 
-SAVE_DIR = "./processed_results"
-if not os.path.isdir(SAVE_DIR):
-    os.mkdir(SAVE_DIR)
-LOG_INTERVAL = [10, 25, 50, 100, 150]
-# LOG_INTERVAL = [10, 20]
-# LOG_INTERVAL = list(range(10, 150, 10))
+def worker(problem_name, target):
+    # problem_name, target = arg
+    target = target.reshape(1, -1)
+    # generate path to save file
+    target_n = map_target_to_target_n(target)
+    file_name = problem_name + f"_{target_n}"
+    save_path = os.path.join(SAVE_DIR, file_name) + ".json"
 
-# allows for path to problem_dir, problem_name and prolem_name/ as arguments 
-# problem_name = sys.argv[1]
-from testsuite.utilities import PROBLEM_CONFIGURATIONS
-# PROBLEM_CONFIGURATIONS = ["wfg1_2obj_3dim"]
-for problem_name in PROBLEM_CONFIGURATIONS:
-    prob_n, obj_n, dim_n = strip_problem_names(problem_name)
-    # if obj_n != 4:
-    #     continue
-    problem_name = problem_name if problem_name[-1] == "/" else problem_name+"/"
-    problem_name = problem_name.split("/")[-2]
-
-    assert problem_name in PROBLEM_CONFIGURATIONS
-
-    # load results
     path_to_result_parent = os.path.join(
         rootpath.detect(),
         "experiments/data/dParEgo/"+problem_name+"/log_data/")
     assert os.path.isdir(path_to_result_parent)
 
-    # path to each target-specific result directory
     path_to_results = [os.path.join(path_to_result_parent, path)
                        for path in os.listdir(path_to_result_parent)]
 
+    if os.path.isfile(save_path):
+        print(f"Existing results found for {problem_name}")
+    else:
+        print(f"No existing results found for {problem_name}")
+        # generate targeted results
+        result_dir = get_dir_from_target(target, path_to_results)
+        assert os.path.isdir(result_dir)
+        results = ResultsContainer(result_dir)
+        print(f"New results file generated at {result_dir}")
+
+        # # add reference data
+        # ref_dir = get_refdir_from_name(problem_name, REF_DIRS)
+        # results.add_reference_data(ref_dir)
+
+        # get reference volume samples
+        results.compute_dual_hypervolume_history(sample_freq=LOG_INTERVAL)
+        print("saving to:\t", save_path)
+        results.save(save_path)
+
+
+SAVE_DIR = "./processed_results"
+if not os.path.isdir(SAVE_DIR):
+    os.mkdir(SAVE_DIR)
+LOG_INTERVAL = [10, 25, 50, 100, 150]
+
+config_pairs = []
+for problem_name in PROBLEM_CONFIGURATIONS:
+    problem_name = problem_name if problem_name[-1] == "/" else problem_name+"/"
+    problem_name = problem_name.split("/")[-2]
 
     targets = np.asarray(TARGETS_D[problem_name])
+    for t in targets:
+        config_pairs.append((problem_name, t))
 
 
-    def worker(target):
-        print(target.shape, target)
-
-        # generate path to save file
-        target_n = map_target_to_target_n(target)
-        file_name = problem_name + f"_{target_n}"
-        save_path = os.path.join(SAVE_DIR, file_name) + ".json"
-
-        if os.path.isfile(save_path):
-            results = ResultsContainer(save_path)
-            print(f"Existing results found for {problem_name}")
-        else:
-            print(f"No existing results found for {problem_name}")
-            # generate targeted results
-            result_dir = get_dir_from_target(target, path_to_results)
-            assert os.path.isdir(result_dir)
-            results = ResultsContainer(result_dir)
-            print(f"New results file generated at {result_dir}")
-
-            # # add reference data
-            # ref_dir = get_refdir_from_name(problem_name, REF_DIRS)
-            # results.add_reference_data(ref_dir)
-
-            # get reference volume samples
-            results.compute_dual_hypervolume_history(sample_freq=LOG_INTERVAL)
-            print("saving to:\t", save_path)
-            results.save(save_path)
-
-
-    with Pool(4) as p:
-        p.starmap(worker, [t.reshape(1, -1) for t in targets])
+with Pool(4) as p:
+    p.starmap(worker, config_pairs)

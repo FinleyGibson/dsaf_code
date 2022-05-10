@@ -10,14 +10,13 @@ import pandas
 PATH_TO_REPORT_REPO = "/home/finley/phd/papers/gecco_2022/DSAF_EMO/"
 
 def save_table(df, file_name):
-    pass
-    #savedirs = [
-    #    os.path.join(rootpath.detect(), "experiments/directed/analysis/results_tables/paper_figure_notebooks/tables/"),
-    #    os.path.join(PATH_TO_REPORT_REPO, "tables/")]
-    #for d in savedirs:
-    #    file_path = os.path.join(d, file_name+".tex")
-    #    with open(file_path, "w") as outfile:
-    #        print(df.to_latex(index=True, escape=False), file=outfile)
+    savedirs = [
+        os.path.join(rootpath.detect(), "experiments/directed/analysis/results_tables/paper_figure_notebooks/tables/"),
+        os.path.join(PATH_TO_REPORT_REPO, "tables/")]
+    for d in savedirs:
+        file_path = os.path.join(d, file_name+".tex")
+        with open(file_path, "w") as outfile:
+            print(df.to_latex(index=True, escape=False), file=outfile)
         
         
 def get_comparison_matrices(result, intervals=None, attainable=False):

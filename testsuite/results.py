@@ -168,7 +168,7 @@ class ResultsContainer:
             array of reference points for targeted optimisation
         """
         # ensure problem configurations are identical across all Results
-        for attribute in ['n_prob', 'n_obj', 'n_dim', 'targets']:
+        for attribute in ['n_prob', 'n_obj', 'n_dim']:
             assert np.all([getattr(self.results[0], attribute)
                            == getattr(r, attribute) for r in self.results])
             # ensure problem configurations are identical across
@@ -224,7 +224,7 @@ class ResultsContainer:
             for result in self.reference:
                 result.compute_igd_history(reference_points=reference_points,
                                            sample_freq=sample_freq)
-        except AttributeError:
+        except TypeError:
             assert self.reference is None
             # no reference points present
 
@@ -232,9 +232,10 @@ class ResultsContainer:
         self.igd_hist_x = self.results[0].igd_hist_x
 
         # TODO: this crashes if no reference data present: fix.
-        self.igdref_history = np.vstack([r.igd_history
-                                         for r in self.reference])
-        self.igdref_hist_x = self.reference[0].igd_hist_x
+        if self.reference is not None:
+            self.igdref_history = np.vstack([r.igd_history
+                                             for r in self.reference])
+            self.igdref_hist_x = self.reference[0].igd_hist_x
 
     def compute_doh_history(self, reference_point=None, sample_freq=1):
         if reference_point is None:
