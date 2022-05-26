@@ -597,7 +597,7 @@ class SmsEgo(BayesianOptimiser):
 
     def _compute_hypervolume(self, p=None):
         """
-        Calcualte the current hypervolume, or that of the provided y.
+        Calculate the current hypervolume, or that of the provided y.
         """
         if p is None:
             p = self.apply_weighting(self.p)

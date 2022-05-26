@@ -1,7 +1,7 @@
 import numpy as np
 import wfg
 
-from testsuite.optimisers import Saf, ParEgo
+from testsuite.optimisers import Saf, ParEgo, Optimiser
 from testsuite.utilities import Pareto_split, optional_inversion, sigmoid
 from testsuite.acquisition_functions import scalar_expected_improvement
 from itertools import combinations
@@ -48,7 +48,7 @@ class DirectedSaf(Saf):
         return Dq
 
     @optional_inversion
-    def osaf(self, y: np.ndarray, p: np.ndarray) -> np.ndarray:
+    def osaf(self, y: np.ndarray, p: np.ndarray, w: float) -> np.ndarray:
         """
         Calculates summary attainment front distances.
         Calculates the distance of n, m-dimensional points X from the
@@ -65,7 +65,7 @@ class DirectedSaf(Saf):
         D_saf = self.saf(y, p)
 
         beta = 1.
-        Dq = self.w*sigmoid(D_saf, beta) + (1-self.w)*sigmoid(D_osaf, beta)
+        Dq = w*sigmoid(D_saf, beta) + (1-w)*sigmoid(D_osaf, beta)
         return Dq
 
     @optional_inversion
@@ -77,12 +77,8 @@ class DirectedSaf(Saf):
         assert y_put.shape[0] == 1
         assert std_put.shape[0] == 1
 
-        if self.ei:
-            return float(self.osaf_ei(y_put, std_put, n_samples=3000*self.n_objectives,
-                                     invert=False))
-        else:
-            return float(self.osaf(y_put, self.apply_weighting(self.p),
-                                  invert=False))
+        return float(self.osaf(y_put, self.apply_weighting(self.p), w=self.w,
+                               invert=False))
 
     def update_targets(self, new_targets):
         self.targets = np.asarray(new_targets)
@@ -374,6 +370,157 @@ class DirectedParEgo(ParEgo):
         return super()._get_loggables(**log_data, **kwargs)
 
 
+class DirectedWHedge(Optimiser):
+    def __init__(self,
+                 objective_function,
+                 limits,
+                 surrogate,
+                 w,
+                 eta,
+                 targets,
+                 cmaes_restarts=0,
+                 n_initial=10,
+                 budget=30,
+                 of_args=[],
+                 seed=None,
+                 log_dir="./log_data",
+                 log_interval=None
+    ):
+
+        super().__init__(
+            objective_function=objective_function,
+            limits=limits,
+            n_initial=n_initial,
+            budget=budget,
+            of_args=of_args,
+            seed=seed,
+            log_dir=log_dir,
+            log_interval=log_interval
+        )
+
+        self.surrogate = surrogate
+        self.targets = targets
+        self.w = w
+        self.eta = eta
+        self.cmaes_restarts = cmaes_restarts
+
+        self.chosen_x_history = np.empty((0, len(self.w), self.n_dims))
+
+    def get_next_x(self, excluded_indices: list=None):
+        
+        if excluded_indices is not None:
+            # handle observations to be excluded from the model.
+            x = self.x[[i for i in range(len(self.x))
+                        if i not in excluded_indices]]
+            y = self.y[[i for i in range(len(self.x))
+                        if i not in excluded_indices]]
+        else:
+            x = self.x
+            y = self.y
+
+        y = self.apply_weighting(y)
+
+        # update surrogate
+        self.surrogate.update(x, y)
+
+        w_choices = np.array([self.get_next_x_for_w(wi) for wi in self.w])
+        self.chosen_x_history = np.vstack(
+            (self.chosen_x_history,
+             w_choices.reshape(1, *w_choices.shape))
+        )
+
+        pi = self.chosen_x_history[:, 0:0+1, :]
+        pj = self.calc_pj(pi, self.w[0])
+        pw = [self.calc_pj(self.chosen_x_history[:, i:i+1, :], wi) for wi, i in
+              enumerate(self.w)]
+
+        print("ping")
+
+
+
+
+    def get_next_x_for_w(self, w):
+        seed = np.random.uniform(self.limits[0], self.limits[1],
+                                 self.surrogate.x_dims)
+        res = cma.fmin(self.alpha, seed,
+                       sigma0=0.25,
+                       options={'bounds': [self.limits[0], self.limits[1]],
+                                'maxfevals': 1e5},
+                       args={w},
+                       restarts=self.cmaes_restarts)
+
+        return res[0]
+
+    def calc_pj(self, x, w):
+        x = x.reshape(x.shape[1], x.shape[2])
+        return sum([self._scalarise_y(xi, np.zeros_like(xi), w) for xi in x])
+
+
+
+    def alpha(self, x_, w):
+        y_, var_ = self.surrogate.predict(x_)
+        efficacy = self._scalarise_y(y_, var_ ** 0.5, w, invert=True)
+        return efficacy
+
+    @optional_inversion
+    def _scalarise_y(self, y_, std_, w):
+
+        if y_.ndim < 2:
+            y_ = y_.reshape(1, -1)
+            std_ = std_.reshape(1, -1)
+
+        assert y_.shape[0] == 1
+        assert std_.shape[0] == 1
+
+        return float(
+            self.dsaf(y_, self.apply_weighting(self.p), w=w, invert=False)
+        )
+    
+    @optional_inversion
+    def dsaf(self, y: np.ndarray, p: np.ndarray, w: float) -> np.ndarray:
+        D_osaf = self.optimistic_saf(self.apply_weighting(self.targets), y)
+        D_saf = self.saf(y, p)
+
+        beta = 1.
+        Dq = w*sigmoid(D_saf, beta) + (1-w)*sigmoid(D_osaf, beta)
+        return Dq
+
+    @staticmethod
+    def optimistic_saf(T, X):
+        if T is None:
+            Dq = np.ones(len(X))
+        else:
+            assert T.shape[1] == X.shape[
+                1], "shape missmatch, {} and {}".format(T.shape, X.shape)
+            D = np.zeros((X.shape[0], T.shape[0]))
+            for i, p in enumerate(T):
+                D[:, i] = np.min(p - X, axis=1)
+
+            Dq = np.max(D, axis=1)
+        return Dq
+    
+    @staticmethod
+    @optional_inversion
+    def saf(y: np.ndarray, p: np.ndarray) -> np.ndarray:
+        """
+        Calculates summary attainment front distances.
+        Calculates the distance of n, m-dimensional points X from the
+        summary attainment front defined by points P
+
+        :param np.array p: points in the pareto front, shape[?,m]
+        :param np.array y: points for which the distance to the summary
+        attainment front is to be calculated, shape[n,m]
+
+        :return np.array: numpy array of saf distances between points in
+        X and saf defined by P, shape[X.shape]
+        """
+
+        D = np.zeros((y.shape[0], p.shape[0]))
+
+        for i, p in enumerate(p):
+            D[:, i] = np.max(p - y, axis=1).reshape(-1)
+        Dq = np.min(D, axis=1)
+        return Dq
 
 if __name__ == "__main__":
     import sys
@@ -403,15 +550,3 @@ if __name__ == "__main__":
         if x.ndim < 2:
             x = x.reshape(1, -1)
         return np.array([ wfg.WFG6(xi, k, M) for xi in x])
-
-    #
-    #
-    # opt.optimise()
-    #
-    #
-    #
-
-    opt = DirectedParEgo(objective_function=objective_function, ei=True,
-                         target=t, limits=limits, surrogate=GP(), n_initial=10,
-                         budget=12, log_dir="./test_results", seed=seed)
-    opt.optimise(2)

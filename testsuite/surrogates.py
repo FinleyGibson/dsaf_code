@@ -1,8 +1,10 @@
 import numpy as np
+import xgboost
 import GPy
 from sklearn.ensemble import ExtraTreesRegressor, RandomForestRegressor
 import sys
 current_module = sys.modules[__name__]
+
 
 class MonoSurrogate:
     def __init__(self, scaled=False):
@@ -214,6 +216,25 @@ class RF(MonoSurrogate):
         else:
             self.model.fit(self.x, self.y)
 
+
+class XGB(MonoSurrogate):
+    def __init__(self, n_estimators, alpha, max_depth, learning_rate,
+                 scaled=True):
+        self.objective ='reg:squarederror'
+        self.n_estimators = n_estimators
+        self.alpha = alpha
+        self.max_depth = max_depth
+        self.learning_rate = learning_rate
+        super().__init__(scaled=scaled)
+        self.model = xgboost.XGBRegressor(objective=self.objective,
+                                          learning_rate=self.learning_rate,
+                                          max_depth=self.max_depth,
+                                          alpha=self.alpha,
+                                          n_estimators=self.n_estimators)
+
+    def update(self, x, y):
+        super().update(x, y)
+        self.model.fit(self.x, self.y)
 
 class MultiSurrogate:
     def __init__(self, surrogate, *args, **kwargs):

@@ -6,7 +6,7 @@ from testsuite.optimisers import *
 from testsuite.surrogates import GP, RF
 
 
-def test_function(x):
+def objective_function(x):
     try:
         return np.array([[np.sum([np.sin(xii) for xii in xi]) for xi in x],
                          [np.sum([np.cos(xii) for xii in xi]) for xi in x],
@@ -24,7 +24,7 @@ class TestBaseOptimiserClass(unittest.TestCase):
     def setUpClass(cls):
 
         limits = np.array([[0, 0], [10, 10]])
-        cls.opt = Optimiser(objective_function=test_function, limits=limits,
+        cls.opt = Optimiser(objective_function=objective_function, limits=limits,
                             n_initial=10, budget=30, seed=None,
                             log_dir="./log_data")
 
@@ -91,6 +91,7 @@ class TestBaseOptimiserClass(unittest.TestCase):
         self.assertTrue(self.opt._already_evaluated(x_evaluated))
         self.assertFalse(self.opt._already_evaluated(x_not_evaluated))
 
+
 @parameterized_class([
     {"name": "GP_unscaled", "surrogate": GP, "args": [],
      "kwargs": {"scaled": False}},
@@ -109,7 +110,7 @@ class TestBayesianOptimiserClass(unittest.TestCase):
         limits = np.array([[0], [10]])
         surr = cls.surrogate(*cls.args, **cls.kwargs)
         cls.opt = BayesianOptimiser(
-            objective_function=test_function, limits=limits, surrogate=surr,
+            objective_function=objective_function, limits=limits, surrogate=surr,
             n_initial=10, seed=None, cmaes_restarts=0)
 
         # mock missing function calls

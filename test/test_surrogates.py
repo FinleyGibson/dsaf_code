@@ -1,13 +1,21 @@
 import unittest
 from parameterized import parameterized_class
-from testsuite.surrogates import MonoSurrogate, MultiSurrogate, GP, RF
+from testsuite.surrogates import MultiSurrogate, GP, RF, XGB
 import numpy as np
 
+
 @parameterized_class([
-    {"name": "GP_unscaled", "surrogate": GP, "args": [], "kwargs": {"scaled": False}},
-    {"name": "GP_scaled", "surrogate": GP, "args": [], "kwargs": {"scaled": True}},
-    {"name": "GP_unscaled", "surrogate": RF, "args": [], "kwargs": {"extra_trees": False}},
-    {"name": "GP_unscaled", "surrogate": RF, "args": [], "kwargs": {"extra_trees": True}}
+    {"name": "GP_unscaled", "surrogate": GP, "args": [],
+     "kwargs": {"scaled": False}},
+    {"name": "GP_scaled", "surrogate": GP, "args": [],
+     "kwargs": {"scaled": True}},
+    {"name": "RF_basic", "surrogate": RF, "args": [],
+     "kwargs": {"extra_trees": False}},
+    {"name": "RF_extra_trees", "surrogate": RF, "args": [],
+     "kwargs": {"extra_trees": True}},
+    {"name": "XGB_unscaled", "surrogate": XGB, "args": [],
+     "kwargs": {"scaled": False, "max_depth":5, "learning_rate":0.5,
+                "n_estimators": 25, "alpha":1}}
 ])
 class TestMonoSurrogate(unittest.TestCase):
 
@@ -98,7 +106,10 @@ class TestMonoSurrogate(unittest.TestCase):
     {"name": "Multi_GP_unscaled", "surrogate": GP, "args": [],
      "kwargs": {}},
     {"name": "Multi_RF_unscaled", "surrogate": RF, "args": [],
-     "kwargs": {"extra_trees": True}}
+     "kwargs": {"extra_trees": True}},
+    {"name": "Multi_XGB_unscaled", "surrogate": XGB, "args": [],
+     "kwargs": {"scaled": False, "max_depth": 5, "learning_rate": 0.5,
+                "n_estimators": 25, "alpha": 1}}
 ])
 class TestMultiSurrogate(unittest.TestCase):
 
